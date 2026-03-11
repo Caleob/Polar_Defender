@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POLAR DEFENDER — Defense Force</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ═══════════════════════════════════════
+     LOGIN SCREEN
+═══════════════════════════════════════ -->
+  <div id="loginScreen">
+    <div class="login-seal">
+      <!-- Shield SVG icon -->
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 4 L56 14 L56 34 C56 48 44 58 32 62 C20 58 8 48 8 34 L8 14 Z" stroke="#00ff88" stroke-width="2"
+          fill="rgba(0,255,136,0.06)" />
+        <path d="M32 14 L44 20 L44 34 C44 42 38 48 32 52 C26 48 20 42 20 34 L20 20 Z" stroke="#00aa55" stroke-width="1"
+          fill="rgba(0,255,136,0.04)" />
+        <line x1="32" y1="20" x2="32" y2="44" stroke="#00ff88" stroke-width="2" />
+        <line x1="22" y1="32" x2="42" y2="32" stroke="#00ff88" stroke-width="2" />
+        <circle cx="32" cy="32" r="3" fill="#00ff88" />
+      </svg>
+    </div>
+
+    <div class="login-agency">UNIFIED POLAR DEFENSE COMMAND</div>
+    <div class="login-title">POLAR DEFENDER</div>
+    <div class="login-subtitle">COORDINATE INTERCEPT SYSTEM · CLEARANCE REQUIRED</div>
+
+    <div class="login-box">
+      <div class="field-group">
+        <label class="field-label">OPERATOR NAME</label>
+        <div class="field-row">
+          <input class="login-input" id="inputFirst" placeholder="FIRST NAME" autocomplete="off" maxlength="20">
+          <input class="login-input short" id="inputLast" placeholder="LAST" autocomplete="off" maxlength="1">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">CALL SIGN <span style="color:#004422">— NICKNAME / CODENAME</span></label>
+        <input class="login-input" id="inputCallsign" placeholder="E.G.  VIPER  /  GHOST  /  MATHWIZ" autocomplete="off"
+          maxlength="16">
+      </div>
+
+      <hr class="login-divider">
+
+      <div class="login-notice">
+        By submitting credentials you acknowledge that all engagement data is recorded for
+        performance evaluation. Coordinates must be plotted manually — automated targeting
+        systems are offline. Accuracy and response time are logged per engagement.
+      </div>
+
+      <button id="loginBtn">▶ SUBMIT CREDENTIALS</button>
+      <div id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+     CREDENTIALS ACCEPTED FLASH
+═══════════════════════════════════════ -->
+  <div id="credAccepted">
+    <div class="cred-stamp">CREDENTIALS ACCEPTED</div>
+    <div class="cred-sub">IDENTITY VERIFIED — CLEARANCE GRANTED</div>
+    <div class="cred-name" id="credName"></div>
+    <div class="cred-bar">
+      <div class="cred-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+     HEADER
+═══════════════════════════════════════ -->
+  <header>
+    <div>
+      <div class="title">POLAR <span>DEFENDER</span></div>
+      <div id="operatorTag">OPERATOR: —</div>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-label">SCORE</span>
+        <span class="stat-value sv-sc" id="scoreDisplay">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">STREAK</span>
+        <span class="stat-value sv-st" id="streakDisplay">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">ACCURACY</span>
+        <span class="stat-value" id="accDisplay">--%</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">WAVE</span>
+        <span class="stat-value sv-wv" id="waveDisplay">1</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════
+     GAME AREA
+═══════════════════════════════════════ -->
+  <div class="game-area">
+    <div class="radar-wrap">
+      <canvas id="radarCanvas" width="520" height="520"></canvas>
+      <div id="timerBarWrap">
+        <div id="timerBar" style="width:100%"></div>
+      </div>
+      <div id="waveAnnounce"></div>
+    </div>
+
+    <div class="side-panel">
+
+      <div class="panel-box" data-label="INCOMING THREAT">
+        <div class="coord-sub">SIGNAL INTERCEPTED</div>
+        <div class="coord-display" id="coordDisplay">( r , θ )</div>
+        <div class="hint" id="hintText">
+          Intercept the threat at <b>( r , θ )</b> before it opens fire.<br>
+          Act fast — first-strike earns max points!
+        </div>
+      </div>
+
+      <div class="panel-box" data-label="SHIELD INTEGRITY">
+        <div class="hp-bar-wrap" id="hpBar">
+          <div class="hp-pip" id="hp1"></div>
+          <div class="hp-pip" id="hp2"></div>
+          <div class="hp-pip" id="hp3"></div>
+          <div class="hp-pip" id="hp4"></div>
+          <div class="hp-pip" id="hp5"></div>
+        </div>
+      </div>
+
+      <div class="panel-box" data-label="FIRE CONTROL">
+        <div id="resultMsg" class="r-wait">— AWAITING TARGET —</div>
+        <div id="turretAngleDisplay">TURRET: IDLE</div>
+        <button id="fireBtn" disabled>⚡ FIRE CANNON</button>
+        <div class="spacebar-hint">[ CLICK TO AIM · SPACE OR BUTTON TO FIRE ]</div>
+      </div>
+
+      <div class="panel-box" data-label="ANGLE REFERENCE">
+        <div class="angle-ref">
+          <b>0°</b> right &nbsp; <b>30°</b> π/6 &nbsp; <b>45°</b> π/4 &nbsp; <b>60°</b> π/3<br>
+          <b>90°</b> up &nbsp;&nbsp;&nbsp; <b>120°</b> 2π/3 &nbsp; <b>135°</b> 3π/4<br>
+          <b>150°</b> 5π/6 &nbsp; <b>180°</b> left &nbsp; <b>210°</b> 7π/6<br>
+          <b>225°</b> 5π/4 &nbsp; <b>240°</b> 4π/3 &nbsp; <b>270°</b> down<br>
+          <b>300°</b> 5π/3 &nbsp; <b>315°</b> 7π/4 &nbsp; <b>330°</b> 11π/6<br>
+          <span class="warn">r = distance from center (max 5)</span>
+        </div>
+      </div>
+
+      <div class="panel-box" data-label="COMBAT LOG" style="flex:1">
+        <div id="killLog">— system ready —</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+     GAME OVER OVERLAY
+═══════════════════════════════════════ -->
+  <div id="overlay">
+    <h1>BASE DESTROYED</h1>
+    <div class="game-counter" id="gameCounter">ENGAGEMENT 1 OF 3</div>
+    <div class="big-score" id="finalScore">0 pts</div>
+    <div class="overlay-stats" id="overlayStats"></div>
+    <div class="overlay-btn-row">
+      <button class="overlay-btn" id="retryBtn">↻ NEW ENGAGEMENT</button>
+      <button class="overlay-btn" id="reportBtn">📋 DOWNLOAD AFTER ACTION REPORT</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
