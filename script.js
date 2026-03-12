@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════
 //  OPERATOR / PERSISTENT SESSION DATA
 // ═══════════════════════════════════════════════════════
-let operator = { first: '', last: '', callsign: '' };
+let operator = { first: '', last: '', callsign: '', difficulty: 'commander' };
 let sessionGames = [];   // array of game result objects, persists across retries
 let currentGameNum = 0;  // 1-indexed
 
@@ -34,7 +34,10 @@ function submitLogin() {
   if (!last) { err.textContent = '⚠ LAST INITIAL REQUIRED'; return; }
   if (!callsign) { err.textContent = '⚠ CALL SIGN REQUIRED'; return; }
 
-  operator = { first, last, callsign };
+  const diffRadio = document.querySelector('input[name="difficulty"]:checked');
+  const difficulty = diffRadio ? diffRadio.value : 'commander';
+
+  operator = { first, last, callsign, difficulty };
   err.textContent = '';
 
   // Hide login, show cred accepted
@@ -76,6 +79,30 @@ const CX = W / 2, CY = H / 2;
 // ═══════════════════════════════════════════════════════
 //  GAME CONFIGURATION (TWEAK THESE VALUES TO ADJUST GAME BALANCE)
 // ═══════════════════════════════════════════════════════
+const DIFFICULTY_SETTINGS = {
+  recruit: {
+    maxHp: 10,
+    warningBonus: 2500,
+    fireBonus: 800,
+    scoreMultiplier: 1.0,
+    label: 'RECRUIT'
+  },
+  veteran: {
+    maxHp: 7,
+    warningBonus: 1200,
+    fireBonus: 400,
+    scoreMultiplier: 1.25,
+    label: 'VETERAN'
+  },
+  commander: {
+    maxHp: 5,
+    warningBonus: 0,
+    fireBonus: 0,
+    scoreMultiplier: 1.5,
+    label: 'COMMANDER'
+  }
+};
+
 const APP_CONFIG = {
   // --- Difficulty & Timing ---
   // How fast the turret swivels into position. Higher = faster.
@@ -102,7 +129,7 @@ const APP_CONFIG = {
   SCORE_HIT: 100,
   STREAK_BONUS: 5,
   KILLS_PER_WAVE: 5,
-  DEBUG: true
+  DEBUG: false
 };
 
 const MAX_R = 5;
@@ -133,6 +160,54 @@ let spawnTime = null;
 let enemy = null;
 
 // ═══════════════════════════════════════════════════════
+//  AUDIO / MUTE HANDLING
+// ═══════════════════════════════════════════════════════
+let musicMuted = false;
+let sfxMuted = false;
+
+const bgMusic = document.getElementById('bgMusic');
+const winMusic = document.getElementById('winMusic');
+const sfxEmerge = document.getElementById('sfxEmerge');
+const sfxExplode = document.getElementById('sfxExplode');
+const sfxEnemyFire = document.getElementById('sfxEnemyFire');
+const sfxTurretFire = document.getElementById('sfxTurretFire');
+const sfxTurretMiss = document.getElementById('sfxTurretMiss');
+
+// Lower music volume for better background blend
+bgMusic.volume = 0.4;
+winMusic.volume = 0.5;
+
+// Initialize toggle state
+document.getElementById('musicToggle').classList.add('on');
+document.getElementById('sfxToggle').classList.add('on');
+
+document.getElementById('musicToggle').addEventListener('click', (e) => {
+  musicMuted = !musicMuted;
+  e.target.textContent = musicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON';
+  e.target.classList.toggle('on', !musicMuted);
+  if (musicMuted) {
+    bgMusic.pause();
+    winMusic.pause();
+  } else if (gameActive && wave <= 10) {
+    bgMusic.play().catch(e => console.log('Audio play error:', e));
+  } else if (!gameActive && wave > 10) {
+    winMusic.play().catch(e => console.log('Audio play error:', e));
+  }
+});
+
+document.getElementById('sfxToggle').addEventListener('click', (e) => {
+  sfxMuted = !sfxMuted;
+  e.target.textContent = sfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON';
+  e.target.classList.toggle('on', !sfxMuted);
+});
+
+function playSfx(audioEl) {
+  if (sfxMuted || !audioEl) return;
+  audioEl.currentTime = 0;
+  audioEl.play().catch(e => console.log('Audio play error:', e));
+}
+
+// ═══════════════════════════════════════════════════════
 //  DIFFICULTY
 // ═══════════════════════════════════════════════════════
 function getAngles() {
@@ -145,9 +220,13 @@ function getAngles() {
 }
 function getWarningMs() { 
   let bonus = (wave >= 6) ? 3000 : 0;
-  return Math.max(APP_CONFIG.WARNING_MIN_MS, APP_CONFIG.WARNING_BASE_MS + bonus - wave * APP_CONFIG.WARNING_SCALE_MS); 
+  const diffBonus = DIFFICULTY_SETTINGS[operator.difficulty].warningBonus;
+  return Math.max(APP_CONFIG.WARNING_MIN_MS, APP_CONFIG.WARNING_BASE_MS + bonus + diffBonus - wave * APP_CONFIG.WARNING_SCALE_MS); 
 }
-function getEnemyFireMs() { return Math.max(APP_CONFIG.ENEMY_FIRE_MIN_MS, APP_CONFIG.ENEMY_FIRE_BASE_MS - wave * APP_CONFIG.ENEMY_FIRE_SCALE_MS); }
+function getEnemyFireMs() { 
+  const diffBonus = DIFFICULTY_SETTINGS[operator.difficulty].fireBonus;
+  return Math.max(APP_CONFIG.ENEMY_FIRE_MIN_MS, APP_CONFIG.ENEMY_FIRE_BASE_MS + diffBonus - wave * APP_CONFIG.ENEMY_FIRE_SCALE_MS); 
+}
 
 // ═══════════════════════════════════════════════════════
 //  COORDINATE UTIL
@@ -223,6 +302,7 @@ function enemyEmerge() {
   phase = 'emerged';
   spawnTime = Date.now();
   enemy = { x: currentTarget.x, y: currentTarget.y, rot: Math.random() * Math.PI * 2, alive: true };
+  playSfx(sfxEmerge);
 
   clearInterval(enemyFireId);
   enemyFireId = setInterval(() => {
@@ -237,6 +317,7 @@ function launchEnemyShot() {
   const steps = 24; let step = 0;
   const p = { x: ex, y: ey };
   enemyProjectiles.push(p);
+  playSfx(sfxEnemyFire);
   const id = setInterval(() => {
     p.x = ex + (tx - ex) * (step / steps); p.y = ey + (ty - ey) * (step / steps); step++;
     if (step > steps) {
@@ -277,6 +358,7 @@ function triggerFire() {
   document.getElementById('fireBtn').disabled = true;
   document.getElementById('fireBtn').className = '';
   turretTurning = true;
+  playSfx(sfxTurretFire);
   setResult('— TURRET ROTATING... —', 'r-wait');
 }
 
@@ -294,8 +376,9 @@ function executeFire() {
     const err = Math.sqrt(dx * dx + dy * dy) / UNIT;
     const isDirect = err < APP_CONFIG.HIT_TOLERANCE_DIRECT, isHit = err < APP_CONFIG.HIT_TOLERANCE;
 
-    if (isHit) {
+      if (isHit) {
       clearEnemyTimers();
+      playSfx(sfxExplode);
       if (enemy) {
         spawnParticles(enemy.x, enemy.y, '#ff3344', 30); spawnParticles(enemy.x, enemy.y, '#ff8800', 16);
         if (isDirect) spawnParticles(enemy.x, enemy.y, '#ffdd00', 20); enemy = null;
@@ -310,7 +393,9 @@ function executeFire() {
       if (wave > maxWave) maxWave = wave;
 
       const timeBonus = Math.max(0, Math.round((isDirect ? 10 : 6) - elapsed) * (isDirect ? 25 : 12));
-      const pts = (isDirect ? APP_CONFIG.SCORE_DIRECT_HIT : APP_CONFIG.SCORE_HIT) + timeBonus + streak * APP_CONFIG.STREAK_BONUS;
+      const mult = DIFFICULTY_SETTINGS[operator.difficulty].scoreMultiplier;
+      const basePts = (isDirect ? APP_CONFIG.SCORE_DIRECT_HIT : APP_CONFIG.SCORE_HIT) + timeBonus + streak * APP_CONFIG.STREAK_BONUS;
+      const pts = Math.round(basePts * mult);
       score += pts;
 
       let resultStr = '';
@@ -339,10 +424,19 @@ function executeFire() {
         if (kills > 0 && kills % APP_CONFIG.KILLS_PER_WAVE === 0) shouldAdvance = true;
       }
 
-      if (shouldAdvance) { wave++; showWaveAnnounce(); }
+      if (shouldAdvance) {
+        wave++;
+        if (wave > 10) {
+          setTimeout(() => { if (gameActive) gameWon(); }, 900);
+          return;
+        } else {
+          showWaveAnnounce();
+        }
+      }
       setTimeout(() => { if (gameActive) advanceRound(); }, 900);
 
     } else {
+      playSfx(sfxTurretMiss);
       spawnParticles(playerClick.x, playerClick.y, '#886600', 10);
       const tStr = currentTarget.thetaStr || `${currentTarget.theta}°`;
       setResult(`✗ MISS — off by ${err.toFixed(2)} units — RE-AIM!`, 'r-miss');
@@ -511,15 +605,20 @@ function spawnParticles(x, y, color, n) {
 
 function damageShield(amt) {
   hp = Math.max(0, hp - amt);
-  for (let i = 1; i <= 5; i++) {
+  const maxHp = DIFFICULTY_SETTINGS[operator.difficulty].maxHp;
+  for (let i = 1; i <= maxHp; i++) {
     const pip = document.getElementById('hp' + i);
-    if (i <= hp) { pip.classList.add('flash'); setTimeout(() => pip.classList.remove('flash'), 350); }
+    if (pip && i <= hp) { pip.classList.add('flash'); setTimeout(() => pip.classList.remove('flash'), 350); }
   }
   updateHP();
 }
 
 function updateHP() {
-  for (let i = 1; i <= 5; i++) document.getElementById('hp' + i).classList.toggle('dead', i > hp);
+  const maxHp = DIFFICULTY_SETTINGS[operator.difficulty].maxHp;
+  for (let i = 1; i <= maxHp; i++) {
+    const pip = document.getElementById('hp' + i);
+    if (pip) pip.classList.toggle('dead', i > hp);
+  }
 }
 
 function shakeScreen() {
@@ -569,10 +668,42 @@ function updateStats() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  GAME OVER
+//  GAME OVER / WIN CONDITIONS
 // ═══════════════════════════════════════════════════════
+function gameWon() {
+  gameActive = false; clearEnemyTimers(); enemy = null; phase = 'idle';
+  bgMusic.pause();
+  if (!musicMuted) winMusic.play().catch(e => console.log('Audio play error:', e));
+
+  const acc = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
+  sessionGames.push({
+    gameNum: currentGameNum,
+    score, kills, totalShots, totalHits, totalDirectHits,
+    wave: 10, acc,
+    log: [...engagementLog]
+  });
+
+  document.getElementById('gameCounter').textContent = `ENGAGEMENT ${currentGameNum} OF SESSION`;
+  document.getElementById('finalScore').textContent = score + ' pts';
+  document.getElementById('overlayStats').innerHTML =
+    `Shots fired: <b style="color:var(--green)">${totalShots}</b> &nbsp;
+     Kills: <b style="color:var(--green)">${kills}</b> &nbsp;
+     Direct hits: <b style="color:var(--yellow)">${totalDirectHits}</b> &nbsp;
+     Accuracy: <b style="color:var(--green)">${acc}%</b><br>
+     Max wave reached: <b style="color:var(--cyan)">10 (CLEARED)</b>`;
+     
+  const overlay = document.getElementById('overlay');
+  overlay.querySelector('h1').textContent = "SECTOR CLEARED";
+  overlay.querySelector('h1').style.color = "var(--green)";
+  overlay.querySelector('h1').style.textShadow = "0 0 30px var(--green), 0 0 60px var(--green)";
+  overlay.style.background = `rgba(2, 13, 8, 0.94) url('End Still.png') center/cover no-repeat`;
+  overlay.style.display = 'flex';
+}
+
 function gameOver() {
   gameActive = false; clearEnemyTimers(); enemy = null; phase = 'idle';
+  bgMusic.pause();
+  
   const acc = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
   sessionGames.push({
     gameNum: currentGameNum,
@@ -588,7 +719,13 @@ function gameOver() {
      Direct hits: <b style="color:var(--yellow)">${totalDirectHits}</b> &nbsp;
      Accuracy: <b style="color:var(--green)">${acc}%</b><br>
      Max wave reached: <b style="color:var(--cyan)">${wave}</b>`;
-  document.getElementById('overlay').style.display = 'flex';
+     
+  const overlay = document.getElementById('overlay');
+  overlay.querySelector('h1').textContent = "BASE DESTROYED";
+  overlay.querySelector('h1').style.color = "var(--red)";
+  overlay.querySelector('h1').style.textShadow = "0 0 30px var(--red), 0 0 60px var(--red)";
+  overlay.style.background = `rgba(2, 13, 8, 0.94)`;
+  overlay.style.display = 'flex';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -608,6 +745,7 @@ function downloadReport() {
   lines.push('');
   lines.push(`  OPERATOR : ${operator.first.toUpperCase()} ${operator.last}`);
   lines.push(`  CALL SIGN: ${operator.callsign}`);
+  lines.push(`  CHALLENGE: ${DIFFICULTY_SETTINGS[operator.difficulty].label} (${DIFFICULTY_SETTINGS[operator.difficulty].scoreMultiplier}x Score Modifier)`);
   lines.push(`  GENERATED: ${timestamp}`);
   lines.push(`  TOTAL ENGAGEMENTS THIS SESSION: ${sessionGames.length}`);
   lines.push('');
@@ -683,13 +821,29 @@ function downloadReport() {
 // ═══════════════════════════════════════════════════════
 document.getElementById('retryBtn').addEventListener('click', () => {
   document.getElementById('overlay').style.display = 'none';
+  winMusic.pause();
+  winMusic.currentTime = 0;
   currentGameNum++;
   startGame();
 });
 
 function startGame() {
   score = 0; streak = 0; totalShots = 0; totalHits = 0; totalDirectHits = 0;
-  kills = 0; wave = 1; maxWave = 1; hp = 5;
+  kills = 0; wave = 1; maxWave = 1; 
+  
+  const maxHp = DIFFICULTY_SETTINGS[operator.difficulty].maxHp;
+  hp = maxHp;
+  
+  // Rebuild the HP bar
+  const hpBar = document.getElementById('hpBar');
+  hpBar.innerHTML = '';
+  for (let i = 1; i <= maxHp; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'hp-pip';
+    pip.id = 'hp' + i;
+    hpBar.appendChild(pip);
+  }
+
   particles = []; friendlyProjectiles = []; enemyProjectiles = []; enemy = null;
   engagementLog = [];
   gameActive = true; phase = 'idle';
@@ -700,6 +854,13 @@ function startGame() {
   document.getElementById('coordDisplay').textContent = '( r , θ )';
   document.getElementById('waveDisplay').textContent = '1';
   cancelAnimationFrame(animId);
+
+  // Resume music
+  if (!musicMuted) {
+    bgMusic.currentTime = 0;
+    bgMusic.play().catch(e => console.log('Audio play error:', e));
+  }
+
   gameLoop();
   setTimeout(newTarget, 500);
 }

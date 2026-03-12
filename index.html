@@ -46,6 +46,42 @@
           maxlength="16">
       </div>
 
+      <div class="field-group">
+        <label class="field-label">CHALLENGE TIER</label>
+        <div class="difficulty-options">
+          <label class="diff-radio">
+            <input type="radio" name="difficulty" value="recruit">
+            <div class="diff-btn">
+              <div class="diff-icon">★</div>
+              <div class="diff-details">
+                <div class="diff-name">RECRUIT</div>
+                <div class="diff-desc">10 SHIELDS · EXTENDED TIME · 1.0X SCORE</div>
+              </div>
+            </div>
+          </label>
+          <label class="diff-radio">
+            <input type="radio" name="difficulty" value="veteran">
+            <div class="diff-btn">
+              <div class="diff-icon">★★</div>
+              <div class="diff-details">
+                <div class="diff-name">VETERAN</div>
+                <div class="diff-desc">7 SHIELDS · STANDARD TIME · 1.25X SCORE</div>
+              </div>
+            </div>
+          </label>
+          <label class="diff-radio">
+            <input type="radio" name="difficulty" value="commander" checked>
+            <div class="diff-btn">
+              <div class="diff-icon">★★★</div>
+              <div class="diff-details">
+                <div class="diff-name">COMMANDER</div>
+                <div class="diff-desc">5 SHIELDS · FAST THREATS · 1.5X SCORE</div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <hr class="login-divider">
 
       <div class="login-notice">
@@ -80,6 +116,10 @@
       <div id="operatorTag">OPERATOR: —</div>
     </div>
     <div class="stats">
+      <div class="mute-controls">
+        <button id="musicToggle" class="mute-btn">🎵 MUSIC: ON</button>
+        <button id="sfxToggle" class="mute-btn">🔊 SFX: ON</button>
+      </div>
       <div class="stat">
         <span class="stat-label">SCORE</span>
         <span class="stat-value sv-sc" id="scoreDisplay">0</span>
@@ -124,11 +164,6 @@
 
       <div class="panel-box" data-label="SHIELD INTEGRITY">
         <div class="hp-bar-wrap" id="hpBar">
-          <div class="hp-pip" id="hp1"></div>
-          <div class="hp-pip" id="hp2"></div>
-          <div class="hp-pip" id="hp3"></div>
-          <div class="hp-pip" id="hp4"></div>
-          <div class="hp-pip" id="hp5"></div>
         </div>
       </div>
 
@@ -170,6 +205,14 @@
       <button class="overlay-btn" id="reportBtn">📋 DOWNLOAD AFTER ACTION REPORT</button>
     </div>
   </div>
+
+  <audio id="bgMusic" src="Playing_Music.mp3" loop></audio>
+  <audio id="winMusic" src="Win_Music.mp3" loop></audio>
+  <audio id="sfxEmerge" src="Enemy_Emerge.mp3"></audio>
+  <audio id="sfxExplode" src="Enemy_Explode.mp3"></audio>
+  <audio id="sfxEnemyFire" src="Enemy_Fire.mp3"></audio>
+  <audio id="sfxTurretFire" src="Turret_Fire.mp3"></audio>
+  <audio id="sfxTurretMiss" src="Turret_Miss.mp3"></audio>
 
   <script src="script.js"></script>
 </body>

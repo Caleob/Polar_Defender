@@ -190,6 +190,79 @@ body::before {
   text-transform: uppercase;
 }
 
+.difficulty-options {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.diff-radio {
+  cursor: pointer;
+  flex: 1;
+}
+
+.diff-radio input {
+  display: none;
+}
+
+.diff-btn {
+  background: rgba(0, 255, 136, 0.02);
+  border: 1px solid var(--border);
+  padding: 10px 6px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.diff-icon {
+  color: var(--dim);
+  font-size: 1rem;
+  margin-bottom: 4px;
+  transition: all 0.2s;
+}
+
+.diff-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+}
+
+.diff-desc {
+  font-size: 0.5rem;
+  color: var(--dim);
+  line-height: 1.3;
+}
+
+.diff-radio:hover .diff-btn {
+  background: rgba(0, 255, 136, 0.08);
+  border-color: var(--green);
+  opacity: 1;
+}
+
+.diff-radio input:checked + .diff-btn {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: var(--green);
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+  opacity: 1;
+}
+
+.diff-radio input:checked + .diff-btn .diff-icon {
+  color: var(--yellow);
+  text-shadow: 0 0 10px var(--yellow);
+}
+
+.diff-radio input:checked + .diff-btn .diff-name {
+  color: var(--yellow);
+  text-shadow: 0 0 10px var(--yellow);
+}
+
 .login-divider {
   border: none;
   border-top: 1px solid #0a2a18;
@@ -348,6 +421,37 @@ header {
   display: flex;
   gap: 20px;
   align-items: center;
+}
+
+.mute-controls {
+  display: flex;
+  gap: 10px;
+  margin-right: 20px;
+  border-right: 1px solid var(--border);
+  padding-right: 20px;
+}
+
+.mute-btn {
+  background: rgba(0, 255, 136, 0.05);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.mute-btn.on {
+  color: var(--green);
+  border-color: var(--green);
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.mute-btn:hover {
+  background: rgba(0, 255, 136, 0.15);
 }
 
 .stat {
