@@ -119,6 +119,7 @@
       <div class="mute-controls">
         <button id="musicToggle" class="mute-btn">🎵 MUSIC: ON</button>
         <button id="sfxToggle" class="mute-btn">🔊 SFX: ON</button>
+        <button id="pauseBtn" class="mute-btn">⏸ PAUSE (TEMPORAL DELAY)</button>
       </div>
       <div class="stat">
         <span class="stat-label">SCORE</span>
@@ -185,10 +186,6 @@
         </div>
       </div>
 
-      <div class="panel-box" data-label="COMBAT LOG" style="flex:1">
-        <div id="killLog">— system ready —</div>
-      </div>
-
     </div>
   </div>
 
@@ -207,6 +204,7 @@
   </div>
 
   <audio id="bgMusic" src="Playing_Music.mp3" loop></audio>
+  <audio id="pauseMusic" src="Pause_Music.mp3" loop></audio>
   <audio id="winMusic" src="Win_Music.mp3" loop></audio>
   <audio id="sfxEmerge" src="Enemy_Emerge.mp3"></audio>
   <audio id="sfxExplode" src="Enemy_Explode.mp3"></audio>

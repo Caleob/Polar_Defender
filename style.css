@@ -25,7 +25,7 @@ body {
   background: var(--bg);
   font-family: 'Share Tech Mono', monospace;
   color: var(--text);
-  min-height: 100vh;
+  height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -454,6 +454,13 @@ header {
   background: rgba(0, 255, 136, 0.15);
 }
 
+.pause-btn-active {
+  color: var(--orange) !important;
+  border-color: var(--orange) !important;
+  background: rgba(255, 136, 0, 0.1) !important;
+  box-shadow: 0 0 15px rgba(255, 136, 0, 0.3) !important;
+}
+
 .stat {
   display: flex;
   flex-direction: column;
@@ -495,8 +502,10 @@ header {
   gap: 14px;
   padding: 10px 16px;
   width: 100%;
-  max-width: 1100px;
-  align-items: flex-start;
+  max-width: 1200px;
+  align-items: stretch;
+  flex: 1;
+  overflow: hidden;
 }
 
 .radar-wrap {
@@ -548,8 +557,9 @@ header {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 240px;
+  justify-content: space-between;
+  height: 536px;
+  min-width: 320px;
 }
 
 .panel-box {
@@ -771,17 +781,7 @@ header {
   color: var(--orange);
 }
 
-#killLog {
-  font-size: 0.67rem;
-  line-height: 1.9;
-  color: var(--dim);
-  max-height: 88px;
-  overflow-y: auto;
-}
 
-.log-direct { color: var(--yellow); }
-.log-hit { color: var(--green); }
-.log-miss { color: #aa5500; }
 
 /* ═══════════════════════════════════════
  GAME OVER OVERLAY

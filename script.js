@@ -12,7 +12,11 @@ document.getElementById('loginBtn').addEventListener('click', submitLogin);
 document.addEventListener('keydown', e => {
   if (document.getElementById('loginScreen').style.display !== 'none' &&
     document.getElementById('loginScreen').style.display !== '') return;
-  if (e.code === 'Space' && gameActive) {
+  if (e.code === 'KeyP') {
+    togglePause();
+    return;
+  }
+  if (e.code === 'Space' && gameActive && !gamePaused) {
     e.preventDefault();
     triggerFire();
   }
@@ -141,7 +145,7 @@ const TURRET_SPEED = APP_CONFIG.TURRET_SPEED;
 // ═══════════════════════════════════════════════════════
 let score = 0, streak = 0, totalShots = 0, totalHits = 0, totalDirectHits = 0;
 let kills = 0, wave = 1, maxWave = 1;
-let hp = 5, gameActive = false;
+let hp = 5, gameActive = false, gamePaused = false;
 let currentTarget = null;
 let playerClick = null;
 let particles = [], friendlyProjectiles = [], enemyProjectiles = [];
@@ -172,9 +176,11 @@ const sfxExplode = document.getElementById('sfxExplode');
 const sfxEnemyFire = document.getElementById('sfxEnemyFire');
 const sfxTurretFire = document.getElementById('sfxTurretFire');
 const sfxTurretMiss = document.getElementById('sfxTurretMiss');
+const pauseMusic = document.getElementById('pauseMusic');
 
 // Lower music volume for better background blend
 bgMusic.volume = 0.4;
+pauseMusic.volume = 0.4;
 winMusic.volume = 0.5;
 
 // Initialize toggle state
@@ -200,6 +206,53 @@ document.getElementById('sfxToggle').addEventListener('click', (e) => {
   e.target.textContent = sfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON';
   e.target.classList.toggle('on', !sfxMuted);
 });
+
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+function togglePause() {
+  if (!gameActive) return;
+  gamePaused = !gamePaused;
+  const btn = document.getElementById('pauseBtn');
+  btn.classList.toggle('pause-btn-active', gamePaused);
+  btn.textContent = gamePaused ? '▶ RESUME PLAY' : '⏸ PAUSE (TEMPORAL DELAY)';
+
+  const cd = document.getElementById('coordDisplay');
+
+  if (gamePaused) {
+    if (cd.textContent !== 'GAME PAUSED') {
+      cd.dataset.originalText = cd.textContent;
+    }
+    cd.textContent = 'GAME PAUSED';
+    cd.style.fontSize = '1.8rem';
+    cd.style.color = 'var(--orange)';
+    
+    const hint = document.getElementById('hintText');
+    hint.dataset.originalHtml = hint.innerHTML;
+    hint.style.visibility = 'hidden';
+    
+    // If music is playing, switch to pause music
+    if (!musicMuted) {
+      bgMusic.pause();
+      pauseMusic.play().catch(e => console.log('Audio play error:', e));
+    }
+  } else {
+    if (cd.dataset.originalText) {
+      cd.textContent = cd.dataset.originalText;
+    }
+    cd.style.fontSize = '';
+    cd.style.color = '';
+    
+    const hint = document.getElementById('hintText');
+    hint.style.visibility = 'visible';
+    
+    // Switch back to bg music
+    pauseMusic.pause();
+    pauseMusic.currentTime = 0;
+    if (!musicMuted && wave <= 10) {
+      bgMusic.play().catch(e => console.log('Audio play error:', e));
+    }
+  }
+}
 
 function playSfx(audioEl) {
   if (sfxMuted || !audioEl) return;
@@ -270,12 +323,24 @@ function newTarget() {
   
   currentTarget = { r, theta, thetaStr, x: pos.x, y: pos.y };
 
-  document.getElementById('coordDisplay').textContent = `( ${r} , ${thetaStr} )`;
+  const cd = document.getElementById('coordDisplay');
+  const newText = `( ${r} , ${thetaStr} )`;
+  if (gamePaused) {
+    cd.dataset.originalText = newText;
+  } else {
+    cd.textContent = newText;
+  }
+
   document.getElementById('fireBtn').disabled = true;
   document.getElementById('fireBtn').className = '';
   setResult('— PLOT & AIM BEFORE EMERGENCE —', 'r-wait');
-  document.getElementById('hintText').innerHTML =
-    `Threat at <b style="color:var(--red)">(${r}, ${thetaStr})</b> — click to aim while you still can!`;
+  const hint = document.getElementById('hintText');
+  const newHint = `Threat at <b style="color:var(--red)">(${r}, ${thetaStr})</b> — click to aim while you still can!`;
+  if (gamePaused) {
+    hint.dataset.originalHtml = newHint;
+  } else {
+    hint.innerHTML = newHint;
+  }
 
   startWarningBar();
 }
@@ -286,6 +351,7 @@ function startWarningBar() {
   clearInterval(warningTickId);
   warningTickId = setInterval(() => {
     if (!gameActive) { clearInterval(warningTickId); return; }
+    if (gamePaused) return;
     rem -= 40;
     const f = rem / dur;
     const bar = document.getElementById('timerBar');
@@ -306,7 +372,7 @@ function enemyEmerge() {
 
   clearInterval(enemyFireId);
   enemyFireId = setInterval(() => {
-    if (!gameActive || !enemy || !enemy.alive) return;
+    if (!gameActive || !enemy || !enemy.alive || gamePaused) return;
     launchEnemyShot();
   }, getEnemyFireMs());
 }
@@ -319,6 +385,7 @@ function launchEnemyShot() {
   enemyProjectiles.push(p);
   playSfx(sfxEnemyFire);
   const id = setInterval(() => {
+    if (gamePaused) return;
     p.x = ex + (tx - ex) * (step / steps); p.y = ey + (ty - ey) * (step / steps); step++;
     if (step > steps) {
       clearInterval(id);
@@ -333,7 +400,7 @@ function launchEnemyShot() {
 //  INPUT
 // ═══════════════════════════════════════════════════════
 canvas.addEventListener('click', e => {
-  if (!gameActive || !currentTarget || phase === 'resolving' || phase === 'idle') return;
+  if (!gameActive || gamePaused || !currentTarget || phase === 'resolving' || phase === 'idle') return;
   const rect = canvas.getBoundingClientRect();
   const sx = W / rect.width, sy = H / rect.height;
   playerClick = { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
@@ -353,7 +420,7 @@ document.addEventListener('keydown', e => {
 });
 
 function triggerFire() {
-  if (!gameActive || !playerClick || turretTurning) return;
+  if (!gameActive || gamePaused || !playerClick || turretTurning) return;
   if (phase === 'resolving' || phase === 'idle') return;
   document.getElementById('fireBtn').disabled = true;
   document.getElementById('fireBtn').className = '';
@@ -455,6 +522,7 @@ function launchFriendlyProjectile(x1, y1, x2, y2, onDone) {
   const p = { x: x1, y: y1, px: x1, py: y1 };
   friendlyProjectiles.push(p);
   const id = setInterval(() => {
+    if (gamePaused) return;
     p.px = p.x; p.py = p.y;
     p.x = x1 + (x2 - x1) * (step / steps); p.y = y1 + (y2 - y1) * (step / steps); step++;
     if (step > steps) { clearInterval(id); const i = friendlyProjectiles.indexOf(p); if (i !== -1) friendlyProjectiles.splice(i, 1); onDone(); }
@@ -465,8 +533,16 @@ function launchFriendlyProjectile(x1, y1, x2, y2, onDone) {
 //  DRAW LOOP
 // ═══════════════════════════════════════════════════════
 function gameLoop() {
-  drawRadarBg(); drawEnemy(); drawPlayerAim();
-  drawProjectiles(); drawParticles(); drawTurret();
+  if (!gamePaused) {
+    drawRadarBg(); drawEnemy(); drawPlayerAim();
+    drawProjectiles(); drawParticles(); drawTurret();
+  } else {
+    // While paused, still draw to keep screen content but skip logic/animations
+    // Note: Some draw calls have side effects (updates), so we might want a 'static' draw or just skip
+    // To preserve the 'frozen' look, we can just skip the whole loop if paused, but 
+    // that might cause flicker if we don't clear. 
+    // Actually, keeping the last frame is better.
+  }
   animId = requestAnimationFrame(gameLoop);
 }
 
@@ -654,6 +730,7 @@ function setResult(msg, cls) {
 
 function addLog(html) {
   const log = document.getElementById('killLog');
+  if (!log) return;
   log.innerHTML = html + '<br>' + log.innerHTML;
   const lines = log.innerHTML.split('<br>');
   if (lines.length > 14) log.innerHTML = lines.slice(0, 14).join('<br>');
@@ -673,6 +750,8 @@ function updateStats() {
 function gameWon() {
   gameActive = false; clearEnemyTimers(); enemy = null; phase = 'idle';
   bgMusic.pause();
+  pauseMusic.pause();
+  pauseMusic.currentTime = 0;
   if (!musicMuted) winMusic.play().catch(e => console.log('Audio play error:', e));
 
   const acc = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
@@ -703,6 +782,8 @@ function gameWon() {
 function gameOver() {
   gameActive = false; clearEnemyTimers(); enemy = null; phase = 'idle';
   bgMusic.pause();
+  pauseMusic.pause();
+  pauseMusic.currentTime = 0;
   
   const acc = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
   sessionGames.push({
@@ -846,11 +927,18 @@ function startGame() {
 
   particles = []; friendlyProjectiles = []; enemyProjectiles = []; enemy = null;
   engagementLog = [];
-  gameActive = true; phase = 'idle';
+  gameActive = true; gamePaused = false; phase = 'idle';
   turretAngle = 0; turretTarget = null; turretTurning = false;
+  
+  const pauseBtn = document.getElementById('pauseBtn');
+  pauseBtn.classList.remove('pause-btn-active');
+  pauseBtn.textContent = '⏸ PAUSE (TEMPORAL DELAY)';
+  pauseMusic.pause();
+  pauseMusic.currentTime = 0;
   clearEnemyTimers();
   updateHP(); updateStats();
-  document.getElementById('killLog').innerHTML = '— combat initiated —';
+  const kl = document.getElementById('killLog');
+  if (kl) kl.innerHTML = '— combat initiated —';
   document.getElementById('coordDisplay').textContent = '( r , θ )';
   document.getElementById('waveDisplay').textContent = '1';
   cancelAnimationFrame(animId);
