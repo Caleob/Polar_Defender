@@ -110,6 +110,33 @@
   <!-- ═══════════════════════════════════════
      HEADER
 ═══════════════════════════════════════ -->
+  <div id="missionBrief" aria-hidden="true">
+    <div class="brief-card">
+      <div class="brief-kicker">MISSION BRIEF</div>
+      <h2>POLAR INTERCEPT PROTOCOL</h2>
+      <p class="brief-lead">Plot each threat by recognizing its polar coordinate and tapping the matching point on the radar.</p>
+      <div class="brief-grid">
+        <div class="brief-step">
+          <div class="brief-step-title">1. Read The Signal</div>
+          <p><b>(r, Î¸)</b> means radius from the center, then angle from the positive x-axis.</p>
+        </div>
+        <div class="brief-step">
+          <div class="brief-step-title">2. Tap To Fire</div>
+          <p>Tap or click the matching spot once. The turret locks, rotates, and fires automatically.</p>
+        </div>
+        <div class="brief-step">
+          <div class="brief-step-title">3. Expect Escalation</div>
+          <p>Later waves add radians and, on higher tiers, negative radii that map to equivalent locations.</p>
+        </div>
+      </div>
+      <div class="brief-tip" id="briefDifficultySummary"></div>
+      <div class="brief-actions">
+        <button id="briefStartBtn" class="overlay-btn">START MISSION</button>
+        <button id="briefSkipBtn" class="overlay-btn secondary">SKIP BRIEF</button>
+      </div>
+    </div>
+  </div>
+
   <header>
     <div>
       <div class="title">POLAR <span>DEFENDER</span></div>
@@ -117,6 +144,7 @@
     </div>
     <div class="stats">
       <div class="mute-controls">
+        <button id="helpBtn" class="mute-btn on">? BRIEF</button>
         <button id="musicToggle" class="mute-btn">🎵 MUSIC: ON</button>
         <button id="sfxToggle" class="mute-btn">🔊 SFX: ON</button>
         <button id="pauseBtn" class="mute-btn">⏸ PAUSE (TEMPORAL DELAY)</button>

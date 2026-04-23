@@ -4,6 +4,35 @@
 let operator = { first: '', last: '', callsign: '', difficulty: 'commander' };
 let sessionGames = [];   // array of game result objects, persists across retries
 let currentGameNum = 0;  // 1-indexed
+const HELP_STORAGE_KEY = 'polarDefenderTutorialSeen';
+let tutorialSeen = localStorage.getItem(HELP_STORAGE_KEY) === '1';
+let pendingGameStart = false;
+let briefResumeAction = null;
+
+const resultMsgEl = document.getElementById('resultMsg');
+if (resultMsgEl && !document.getElementById('shotState')) {
+  const shotStateEl = document.createElement('div');
+  shotStateEl.id = 'shotState';
+  shotStateEl.className = 'shot-state idle';
+  shotStateEl.textContent = 'READY TO INTERCEPT';
+  resultMsgEl.parentNode.insertBefore(shotStateEl, resultMsgEl);
+}
+
+const statusPanel = resultMsgEl ? resultMsgEl.closest('.panel-box') : null;
+if (statusPanel) {
+  statusPanel.dataset.label = 'SHOT STATUS';
+  statusPanel.classList.add('status-box');
+}
+
+const diffDescriptions = {
+  recruit: 'DEGREES FIRST · LATE RADIANS · 10 SHIELDS · 1.0X SCORE',
+  veteran: 'MIXED ANGLES · MIDGAME RADIANS · 7 SHIELDS · 1.25X SCORE',
+  commander: 'EARLY RADIANS · NEGATIVE RADII · 5 SHIELDS · 1.5X SCORE'
+};
+document.querySelectorAll('input[name="difficulty"]').forEach(input => {
+  const desc = input.closest('.diff-radio')?.querySelector('.diff-desc');
+  if (desc && diffDescriptions[input.value]) desc.textContent = diffDescriptions[input.value];
+});
 
 // ═══════════════════════════════════════════════════════
 //  LOGIN
@@ -16,9 +45,8 @@ document.addEventListener('keydown', e => {
     togglePause();
     return;
   }
-  if (e.code === 'Space' && gameActive && !gamePaused) {
-    e.preventDefault();
-    triggerFire();
+  if (e.code === 'Escape' && document.getElementById('missionBrief').classList.contains('open')) {
+    closeMissionBrief();
   }
 });
 // Allow Enter key on login fields
@@ -83,29 +111,132 @@ const CX = W / 2, CY = H / 2;
 // ═══════════════════════════════════════════════════════
 //  GAME CONFIGURATION (TWEAK THESE VALUES TO ADJUST GAME BALANCE)
 // ═══════════════════════════════════════════════════════
+const ANGLE_SETS = {
+  benchmark: [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330],
+  every15: Array.from({ length: 24 }, (_, i) => i * 15),
+  every30: Array.from({ length: 12 }, (_, i) => i * 30)
+};
+
 const DIFFICULTY_SETTINGS = {
   recruit: {
     maxHp: 10,
     warningBonus: 2500,
     fireBonus: 800,
     scoreMultiplier: 1.0,
-    label: 'RECRUIT'
+    label: 'RECRUIT',
+    brief: 'Recruit emphasizes degree recognition first and waits until late waves to introduce radians.'
   },
   veteran: {
     maxHp: 7,
     warningBonus: 1200,
     fireBonus: 400,
     scoreMultiplier: 1.25,
-    label: 'VETERAN'
+    label: 'VETERAN',
+    brief: 'Veteran mixes degree and radian labels by midgame and adds limited negative-radius practice.'
   },
   commander: {
     maxHp: 5,
     warningBonus: 0,
     fireBonus: 0,
     scoreMultiplier: 1.5,
-    label: 'COMMANDER'
+    label: 'COMMANDER',
+    brief: 'Commander reaches radians early and introduces negative radii in the back half of the mission.'
   }
 };
+
+const DIFFICULTY_WAVES = {
+  recruit: [
+    { angles: ANGLE_SETS.every30, labelMode: 'degree', radii: [1, 2, 3], negativeRadii: false, warningMs: 7200, fireMs: 1400 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'degree', radii: [1, 2, 3, 4], negativeRadii: false, warningMs: 6800, fireMs: 1280 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'degree', radii: [1, 2, 3, 4], negativeRadii: false, warningMs: 6400, fireMs: 1200 },
+    { angles: ANGLE_SETS.every15, labelMode: 'degree', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 6000, fireMs: 1120 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'degree', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 5600, fireMs: 1040 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'degree', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 5200, fireMs: 980 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4900, fireMs: 940 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4600, fireMs: 900 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4300, fireMs: 860 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4000, fireMs: 820 }
+  ],
+  veteran: [
+    { angles: ANGLE_SETS.benchmark, labelMode: 'degree', radii: [1, 2, 3], negativeRadii: false, warningMs: 6200, fireMs: 1220 },
+    { angles: ANGLE_SETS.every15, labelMode: 'degree', radii: [1, 2, 3, 4], negativeRadii: false, warningMs: 5800, fireMs: 1120 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'mixed', radii: [1, 2, 3, 4], negativeRadii: false, warningMs: 5400, fireMs: 1020 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 5000, fireMs: 960 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4700, fireMs: 900 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4400, fireMs: 860 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'mixed', radii: [2, 3, 4, 5], negativeRadii: true, warningMs: 4100, fireMs: 820 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [2, 3, 4, 5], negativeRadii: true, warningMs: 3800, fireMs: 780 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 3500, fireMs: 740 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 3200, fireMs: 700 }
+  ],
+  commander: [
+    { angles: ANGLE_SETS.benchmark, labelMode: 'mixed', radii: [1, 2, 3, 4], negativeRadii: false, warningMs: 5200, fireMs: 980 },
+    { angles: ANGLE_SETS.benchmark, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4800, fireMs: 900 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4400, fireMs: 820 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: false, warningMs: 4000, fireMs: 760 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 3700, fireMs: 720 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [2, 3, 4, 5], negativeRadii: true, warningMs: 3400, fireMs: 680 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [2, 3, 4, 5], negativeRadii: true, warningMs: 3100, fireMs: 650 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 2800, fireMs: 620 },
+    { angles: ANGLE_SETS.every15, labelMode: 'mixed', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 2550, fireMs: 590 },
+    { angles: ANGLE_SETS.every15, labelMode: 'radian', radii: [1, 2, 3, 4, 5], negativeRadii: true, warningMs: 2300, fireMs: 560 }
+  ]
+};
+
+function getWaveProfile() {
+  const profiles = DIFFICULTY_WAVES[operator.difficulty] || DIFFICULTY_WAVES.commander;
+  return profiles[Math.min(wave, profiles.length) - 1];
+}
+
+function getTargetThetaLabel(theta, labelMode) {
+  if (labelMode === 'degree') return `${theta}\u00B0`;
+  if (labelMode === 'radian') return degreeToRadianStr(theta);
+  return Math.random() < 0.5 ? `${theta}\u00B0` : degreeToRadianStr(theta);
+}
+
+function setShotState(label, state = 'idle') {
+  const el = document.getElementById('shotState');
+  if (!el) return;
+  el.textContent = label;
+  el.className = `shot-state ${state}`;
+}
+
+function updateBriefSummary() {
+  const el = document.getElementById('briefDifficultySummary');
+  if (!el) return;
+  const diff = DIFFICULTY_SETTINGS[operator.difficulty] || DIFFICULTY_SETTINGS.commander;
+  el.textContent = `${diff.label}: ${diff.brief}`;
+}
+
+function openMissionBrief() {
+  updateBriefSummary();
+  const brief = document.getElementById('missionBrief');
+  brief.classList.add('open');
+  brief.setAttribute('aria-hidden', 'false');
+}
+
+function closeMissionBrief() {
+  const brief = document.getElementById('missionBrief');
+  brief.classList.remove('open');
+  brief.setAttribute('aria-hidden', 'true');
+
+  if (!tutorialSeen) {
+    tutorialSeen = true;
+    localStorage.setItem(HELP_STORAGE_KEY, '1');
+  }
+
+  if (pendingGameStart) {
+    pendingGameStart = false;
+    startGame();
+    return;
+  }
+
+  if (typeof briefResumeAction === 'function') {
+    const resume = briefResumeAction;
+    briefResumeAction = null;
+    resume();
+  }
+}
 
 const APP_CONFIG = {
   // --- Difficulty & Timing ---
@@ -136,6 +267,13 @@ const APP_CONFIG = {
   DEBUG: false
 };
 
+const POLAR_TOLERANCE = {
+  DIRECT_RADIUS: 0.25,
+  DIRECT_ANGLE: 6,
+  HIT_RADIUS: 0.5,
+  HIT_ANGLE: 12
+};
+
 const MAX_R = 5;
 const UNIT = (W / 2 - 32) / MAX_R;
 const TURRET_SPEED = APP_CONFIG.TURRET_SPEED;
@@ -162,6 +300,7 @@ let phase = 'idle';
 let warningTickId = null, enemyFireId = null;
 let spawnTime = null;
 let enemy = null;
+let targetProfile = null;
 
 // ═══════════════════════════════════════════════════════
 //  AUDIO / MUTE HANDLING
@@ -208,6 +347,25 @@ document.getElementById('sfxToggle').addEventListener('click', (e) => {
 });
 
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('briefStartBtn').addEventListener('click', closeMissionBrief);
+document.getElementById('briefSkipBtn').addEventListener('click', closeMissionBrief);
+document.getElementById('helpBtn').addEventListener('click', () => {
+  if (document.getElementById('missionBrief').classList.contains('open')) {
+    closeMissionBrief();
+    return;
+  }
+
+  if (gameActive && !gamePaused) {
+    togglePause();
+    briefResumeAction = () => {
+      if (gamePaused) togglePause();
+    };
+  } else {
+    briefResumeAction = null;
+  }
+
+  openMissionBrief();
+});
 
 function togglePause() {
   if (!gameActive) return;
@@ -263,22 +421,12 @@ function playSfx(audioEl) {
 // ═══════════════════════════════════════════════════════
 //  DIFFICULTY
 // ═══════════════════════════════════════════════════════
-function getAngles() {
-  if (wave <= 2) return [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
-  if (wave <= 4) { const a = []; for (let i = 0; i < 360; i += 15) a.push(i); return a; }
-  if (wave === 5) { const a = []; for (let i = 0; i < 360; i += 3) a.push(i); return a; }
-  if (wave <= 7) return [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
-  if (wave <= 9) { const a = []; for (let i = 0; i < 360; i += 15) a.push(i); return a; }
-  const a = []; for (let i = 0; i < 360; i += 20) a.push(i); return a;
+function getWarningMs() {
+  return getWaveProfile().warningMs;
 }
-function getWarningMs() { 
-  let bonus = (wave >= 6) ? 3000 : 0;
-  const diffBonus = DIFFICULTY_SETTINGS[operator.difficulty].warningBonus;
-  return Math.max(APP_CONFIG.WARNING_MIN_MS, APP_CONFIG.WARNING_BASE_MS + bonus + diffBonus - wave * APP_CONFIG.WARNING_SCALE_MS); 
-}
-function getEnemyFireMs() { 
-  const diffBonus = DIFFICULTY_SETTINGS[operator.difficulty].fireBonus;
-  return Math.max(APP_CONFIG.ENEMY_FIRE_MIN_MS, APP_CONFIG.ENEMY_FIRE_BASE_MS + diffBonus - wave * APP_CONFIG.ENEMY_FIRE_SCALE_MS); 
+
+function getEnemyFireMs() {
+  return getWaveProfile().fireMs;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -287,6 +435,19 @@ function getEnemyFireMs() {
 function polarToCanvas(r, deg) {
   const rad = deg * Math.PI / 180;
   return { x: CX + r * UNIT * Math.cos(rad), y: CY - r * UNIT * Math.sin(rad) };
+}
+
+function canvasToPolar(x, y) {
+  const dx = x - CX;
+  const dy = CY - y;
+  const radius = Math.sqrt(dx * dx + dy * dy) / UNIT;
+  let theta = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+  return { radius, theta };
+}
+
+function angleDiffDeg(a, b) {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -309,33 +470,32 @@ function newTarget() {
   phase = 'warning';
   playerClick = null; turretTarget = null; turretTurning = false;
   enemy = null; friendlyProjectiles = []; enemyProjectiles = [];
+  targetProfile = getWaveProfile();
 
-  const rVals = [1, 2, 3, 4, 5];
-  const angles = getAngles();
-  const r = rVals[Math.floor(Math.random() * rVals.length)];
-  const theta = angles[Math.floor(Math.random() * angles.length)];
-  const pos = polarToCanvas(r, theta);
+  const baseRadius = targetProfile.radii[Math.floor(Math.random() * targetProfile.radii.length)];
+  const signedRadius = targetProfile.negativeRadii && Math.random() < 0.3 ? -baseRadius : baseRadius;
+  const theta = targetProfile.angles[Math.floor(Math.random() * targetProfile.angles.length)];
+  const resolvedTheta = signedRadius < 0 ? (theta + 180) % 360 : theta;
+  const resolvedRadius = Math.abs(signedRadius);
+  const pos = polarToCanvas(resolvedRadius, resolvedTheta);
   
   let thetaStr = `${theta}°`;
-  if (wave >= 6) {
-    thetaStr = degreeToRadianStr(theta);
-  }
+  thetaStr = getTargetThetaLabel(theta, targetProfile.labelMode);
   
-  currentTarget = { r, theta, thetaStr, x: pos.x, y: pos.y };
+  currentTarget = { r: signedRadius, theta, thetaStr, x: pos.x, y: pos.y, resolvedRadius, resolvedTheta };
 
   const cd = document.getElementById('coordDisplay');
-  const newText = `( ${r} , ${thetaStr} )`;
+  const newText = `( ${signedRadius} , ${thetaStr} )`;
   if (gamePaused) {
     cd.dataset.originalText = newText;
   } else {
     cd.textContent = newText;
   }
 
-  document.getElementById('fireBtn').disabled = true;
-  document.getElementById('fireBtn').className = '';
-  setResult('— PLOT & AIM BEFORE EMERGENCE —', 'r-wait');
+  setShotState('READY TO INTERCEPT', 'idle');
+  setResult('— TAP THE RADAR TO COMMIT THE SHOT —', 'r-wait');
   const hint = document.getElementById('hintText');
-  const newHint = `Threat at <b style="color:var(--red)">(${r}, ${thetaStr})</b> — click to aim while you still can!`;
+  const newHint = `Threat at <b style="color:var(--red)">(${signedRadius}, ${thetaStr})</b> — tap the matching radar point before it fires.`;
   if (gamePaused) {
     hint.dataset.originalHtml = newHint;
   } else {
@@ -399,35 +559,18 @@ function launchEnemyShot() {
 // ═══════════════════════════════════════════════════════
 //  INPUT
 // ═══════════════════════════════════════════════════════
-canvas.addEventListener('click', e => {
+canvas.addEventListener('pointerdown', e => {
   if (!gameActive || gamePaused || !currentTarget || phase === 'resolving' || phase === 'idle') return;
+  if (turretTurning) return;
   const rect = canvas.getBoundingClientRect();
   const sx = W / rect.width, sy = H / rect.height;
   playerClick = { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   turretTarget = Math.atan2(playerClick.y - CY, playerClick.x - CX);
-  document.getElementById('fireBtn').disabled = false;
-  document.getElementById('fireBtn').className = 'ready';
-  setResult('— TARGET LOCKED — FIRE! —', 'r-wait blink');
-});
-
-document.getElementById('fireBtn').addEventListener('click', triggerFire);
-
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    if (gameActive) triggerFire();
-  }
-});
-
-function triggerFire() {
-  if (!gameActive || gamePaused || !playerClick || turretTurning) return;
-  if (phase === 'resolving' || phase === 'idle') return;
-  document.getElementById('fireBtn').disabled = true;
-  document.getElementById('fireBtn').className = '';
   turretTurning = true;
+  setShotState('LOCKING TARGET', 'locking');
   playSfx(sfxTurretFire);
-  setResult('— TURRET ROTATING... —', 'r-wait');
-}
+  setResult('— TARGET LOCKED — FIRING SOLUTION CALCULATING —', 'r-wait blink');
+});
 
 // ═══════════════════════════════════════════════════════
 //  FIRE RESOLUTION
@@ -435,13 +578,17 @@ function triggerFire() {
 function executeFire() {
   turretTurning = false;
   if (!gameActive || !playerClick || !currentTarget) return;
+  setShotState('FIRING', 'firing');
   totalShots++;
   const elapsed = spawnTime ? (Date.now() - spawnTime) / 1000 : 999;
 
   launchFriendlyProjectile(CX, CY, playerClick.x, playerClick.y, () => {
-    const dx = playerClick.x - currentTarget.x, dy = playerClick.y - currentTarget.y;
-    const err = Math.sqrt(dx * dx + dy * dy) / UNIT;
-    const isDirect = err < APP_CONFIG.HIT_TOLERANCE_DIRECT, isHit = err < APP_CONFIG.HIT_TOLERANCE;
+    const selected = canvasToPolar(playerClick.x, playerClick.y);
+    const radiusError = Math.abs(selected.radius - currentTarget.resolvedRadius);
+    const angleError = angleDiffDeg(selected.theta, currentTarget.resolvedTheta);
+    const errorStr = `${radiusError.toFixed(2)}r / ${angleError.toFixed(1)}°`;
+    const isDirect = radiusError <= POLAR_TOLERANCE.DIRECT_RADIUS && angleError <= POLAR_TOLERANCE.DIRECT_ANGLE;
+    const isHit = radiusError <= POLAR_TOLERANCE.HIT_RADIUS && angleError <= POLAR_TOLERANCE.HIT_ANGLE;
 
       if (isHit) {
       clearEnemyTimers();
@@ -473,16 +620,17 @@ function executeFire() {
       }
       
       const tStr = currentTarget.thetaStr || `${currentTarget.theta}°`;
-      engagementLog.push({ coord: `(${currentTarget.r}, ${tStr})`, result: resultStr, error: err.toFixed(2), timeS: elapsed.toFixed(1), wave, pts });
+      engagementLog.push({ coord: `(${currentTarget.r}, ${tStr})`, result: resultStr, error: errorStr, timeS: elapsed.toFixed(1), wave, pts });
 
       if (isDirect) {
         setResult(resultStr.includes('PRE-') ? `⚡ ${resultStr}! +${pts} pts` : `⭐ ${resultStr}!  +${pts} pts`, 'r-direct');
-        addLog(`<span class="log-direct">${resultStr.includes('PRE-') ? '⚡' : '⭐'} ${resultStr} (${currentTarget.r}, ${tStr}) err:${err.toFixed(2)} t:${elapsed.toFixed(1)}s +${pts}pts</span>`);
+        addLog(`<span class="log-direct">${resultStr.includes('PRE-') ? '⚡' : '⭐'} ${resultStr} (${currentTarget.r}, ${tStr}) err:${errorStr} t:${elapsed.toFixed(1)}s +${pts}pts</span>`);
       } else {
-        setResult(resultStr.includes('PRE-') ? `⚡ ${resultStr}! +${pts} pts (err ${err.toFixed(2)})` : `✓ ${resultStr}!  +${pts} pts  (err ${err.toFixed(2)})`, 'r-hit');
-        addLog(`<span class="log-hit">${resultStr.includes('PRE-') ? '⚡' : '✓'} ${resultStr} (${currentTarget.r}, ${tStr}) err:${err.toFixed(2)} t:${elapsed.toFixed(1)}s +${pts}pts</span>`);
+        setResult(resultStr.includes('PRE-') ? `⚡ ${resultStr}! +${pts} pts (errorStr${errorStr})` : `✓ ${resultStr}!  +${pts} pts  (errorStr${errorStr})`, 'r-hit');
+        addLog(`<span class="log-hit">${resultStr.includes('PRE-') ? '⚡' : '✓'} ${resultStr} (${currentTarget.r}, ${tStr}) err:${errorStr} t:${elapsed.toFixed(1)}s +${pts}pts</span>`);
       }
 
+      setShotState('TARGET DOWN', 'cooldown');
       phase = 'resolving'; updateStats();
       let shouldAdvance = false;
       if (APP_CONFIG.DEBUG && wave <= 5) {
@@ -506,12 +654,11 @@ function executeFire() {
       playSfx(sfxTurretMiss);
       spawnParticles(playerClick.x, playerClick.y, '#886600', 10);
       const tStr = currentTarget.thetaStr || `${currentTarget.theta}°`;
-      setResult(`✗ MISS — off by ${err.toFixed(2)} units — RE-AIM!`, 'r-miss');
-      addLog(`<span class="log-miss">✗ MISS (${currentTarget.r}, ${tStr}) err:${err.toFixed(2)}</span>`);
-      engagementLog.push({ coord: `(${currentTarget.r}, ${tStr})`, result: 'MISS', error: err.toFixed(2), timeS: elapsed.toFixed(1), wave, pts: 0 });
+      setResult(`✗ MISS — off by ${errorStr} units — RE-AIM!`, 'r-miss');
+      addLog(`<span class="log-miss">✗ MISS (${currentTarget.r}, ${tStr}) err:${errorStr}</span>`);
+      engagementLog.push({ coord: `(${currentTarget.r}, ${tStr})`, result: 'MISS', error: errorStr, timeS: elapsed.toFixed(1), wave, pts: 0 });
       streak = 0; playerClick = null;
-      document.getElementById('fireBtn').disabled = true;
-      document.getElementById('fireBtn').className = '';
+      setShotState('ADJUST AND RETRY', 'idle');
       updateStats();
     }
   });
@@ -712,8 +859,7 @@ function advanceRound() {
   phase = 'idle'; currentTarget = null; playerClick = null;
   turretTarget = null; turretTurning = false;
   friendlyProjectiles = []; enemyProjectiles = []; enemy = null;
-  document.getElementById('fireBtn').disabled = true;
-  document.getElementById('fireBtn').className = '';
+  setShotState('SCANNING FOR NEXT THREAT', 'cooldown');
   newTarget();
 }
 
@@ -929,6 +1075,7 @@ function startGame() {
   engagementLog = [];
   gameActive = true; gamePaused = false; phase = 'idle';
   turretAngle = 0; turretTarget = null; turretTurning = false;
+  targetProfile = null;
   
   const pauseBtn = document.getElementById('pauseBtn');
   pauseBtn.classList.remove('pause-btn-active');
@@ -940,6 +1087,10 @@ function startGame() {
   const kl = document.getElementById('killLog');
   if (kl) kl.innerHTML = '— combat initiated —';
   document.getElementById('coordDisplay').textContent = '( r , θ )';
+  document.getElementById('hintText').innerHTML =
+    'Intercept the threat at <b>( r , θ )</b> before it opens fire.<br>Tap the matching radar position once to lock and fire.';
+  setShotState('READY TO INTERCEPT', 'idle');
+  setResult('— AWAITING TARGET —', 'r-wait');
   document.getElementById('waveDisplay').textContent = '1';
   cancelAnimationFrame(animId);
 

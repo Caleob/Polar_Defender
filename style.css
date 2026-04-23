@@ -425,10 +425,17 @@ header {
 
 .mute-controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-right: 20px;
   border-right: 1px solid var(--border);
   padding-right: 20px;
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
+}
+
+.mute-controls .mute-btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .mute-btn {
@@ -542,14 +549,17 @@ header {
   left: 50%;
   transform: translate(-50%, -50%);
   font-family: 'Orbitron', monospace;
-  font-size: 1.8rem;
+  font-size: clamp(1.2rem, 2.6vw, 1.8rem);
   font-weight: 900;
   color: var(--cyan);
   text-shadow: 0 0 30px var(--cyan), 0 0 60px var(--cyan);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.4s;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: min(80vw, 420px);
+  text-align: center;
+  line-height: 1.2;
   z-index: 50;
 }
 
@@ -884,3 +894,304 @@ header {
 }
 
 .shaking { animation: shake 0.3s ease; }
+
+#missionBrief {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 13, 8, 0.92);
+  z-index: 940;
+}
+
+#missionBrief.open {
+  display: flex;
+}
+
+.brief-card {
+  width: min(760px, 100%);
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(0, 255, 136, 0.08), rgba(0, 255, 136, 0.02)),
+    var(--panel);
+  box-shadow: 0 0 40px rgba(0, 255, 136, 0.12);
+  padding: 28px;
+}
+
+.brief-kicker {
+  font-family: 'Orbitron', monospace;
+  color: var(--cyan);
+  font-size: 0.7rem;
+  letter-spacing: 4px;
+  margin-bottom: 10px;
+}
+
+.brief-card h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 2rem;
+  color: var(--green);
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+  text-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
+}
+
+.brief-lead {
+  font-size: 0.92rem;
+  color: #b8ffd8;
+  line-height: 1.7;
+  margin-bottom: 18px;
+}
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.brief-step {
+  border: 1px solid rgba(0, 170, 85, 0.45);
+  background: rgba(0, 255, 136, 0.03);
+  padding: 14px;
+  min-height: 138px;
+}
+
+.brief-step-title {
+  font-family: 'Orbitron', monospace;
+  color: var(--yellow);
+  font-size: 0.76rem;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.brief-step p,
+.brief-tip {
+  color: #9fd8b7;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.brief-tip {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--orange);
+  background: rgba(255, 136, 0, 0.06);
+}
+
+.brief-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.overlay-btn.secondary {
+  border: 2px solid var(--dim);
+  color: var(--dim);
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.overlay-btn.secondary:hover {
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.game-area {
+  gap: 20px;
+  padding: 14px 18px 18px;
+}
+
+.radar-wrap {
+  width: min(100%, 520px);
+}
+
+#radarCanvas {
+  width: min(100%, 520px);
+  height: auto;
+  touch-action: manipulation;
+}
+
+#timerBarWrap {
+  width: min(100%, 520px);
+}
+
+.side-panel {
+  justify-content: flex-start;
+  gap: 18px;
+  min-width: 360px;
+  height: 532px;
+  align-self: stretch;
+}
+
+.panel-box {
+  padding: 16px 18px 18px;
+}
+
+.coord-display {
+  font-size: clamp(2.3rem, 4vw, 3.4rem);
+  letter-spacing: 3px;
+  margin-top: 2px;
+}
+
+.coord-sub {
+  font-size: 0.72rem;
+  margin-bottom: 10px;
+}
+
+.hint {
+  font-size: 0.88rem;
+  line-height: 1.75;
+  margin-top: 12px;
+}
+
+.status-box {
+  margin-top: auto;
+}
+
+#shotState {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 3px;
+  text-align: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  color: var(--green);
+  background: rgba(0, 255, 136, 0.06);
+}
+
+#shotState.locking {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: rgba(255, 221, 0, 0.08);
+}
+
+#shotState.firing {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: rgba(255, 136, 0, 0.08);
+}
+
+#shotState.cooldown {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: rgba(0, 238, 255, 0.08);
+}
+
+#shotState.idle {
+  color: var(--green);
+}
+
+#resultMsg {
+  font-size: 0.98rem;
+  min-height: 34px;
+  margin-bottom: 10px;
+}
+
+#turretAngleDisplay {
+  font-size: 0.92rem;
+  margin-bottom: 0;
+}
+
+.spacebar-hint {
+  font-size: 0.7rem;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+#fireBtn,
+[data-label="ANGLE REFERENCE"] {
+  display: none !important;
+}
+
+@media (max-width: 1080px) {
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .stats {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .mute-controls {
+    margin-right: 0;
+    padding-right: 0;
+    border-right: none;
+    flex-wrap: wrap;
+  }
+
+  .game-area {
+    flex-direction: column;
+    align-items: center;
+    max-width: 920px;
+  }
+
+  .side-panel {
+    width: min(100%, 520px);
+    min-width: 0;
+    height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .brief-card {
+    padding: 20px 18px;
+  }
+
+  .brief-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .brief-card h2 {
+    font-size: 1.45rem;
+  }
+
+  .brief-actions,
+  .overlay-btn-row {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .overlay-btn,
+  .brief-actions .overlay-btn {
+    width: 100%;
+  }
+
+  .login-box {
+    width: min(92vw, 420px);
+    padding: 24px 18px;
+  }
+
+  .difficulty-options,
+  .field-row {
+    flex-direction: column;
+  }
+
+  .login-input.short {
+    width: 100%;
+  }
+
+  header {
+    padding: 12px;
+  }
+
+  .title {
+    font-size: 1.05rem;
+    letter-spacing: 2px;
+  }
+
+  #operatorTag,
+  .stat-label {
+    font-size: 0.55rem;
+  }
+}
